@@ -39,3 +39,12 @@ add_action('admin_init', function () {
     remove_post_type_support($type, 'trackbacks');
   }
 });
+
+add_action('wp_enqueue_scripts', function () {
+  wp_enqueue_style(
+    'photoblog-style',
+    get_stylesheet_uri(),
+    [],
+    wp_get_theme()->get('Version')
+  );
+});
