@@ -1,69 +1,160 @@
 /*
 Theme Name: Photoblog
-Description: Minimal single-photo-per-post theme
-Author: Stephen
-Version: 1.0
+Description: Minimal single-photo-per-post theme — dark/centered-column update
+Author: Stephen (updated by sdiverdi)
+Version: 1.1
 */
 
 * {
   box-sizing: border-box;
 }
 
+/* Dark theme base */
+html, body {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #fff;
-  color: #111;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #000;            /* black background */
+  color: #fff;                 /* white text */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Links */
 a {
-  color: inherit;
+  color: #fff;
   text-decoration: none;
+  outline: none;
+}
+a:hover,
+a:focus {
+  text-decoration: underline;
 }
 
+/* Header / footer */
 header, footer {
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   text-align: center;
+}header h1, footer p {
+  margin: 0;
+  color: #fff;
+  font-weight: 500;
 }
 
+/* Main layouts
+   - index page uses .photo-grid but becomes a single centered column
+   - single-photo view uses .single-photo and will be full-viewport centered
+*/
+
+/* Photo list (main page) — single centered column */
 .photo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 1.5rem;
   padding: 1.5rem;
-}
-
-.photo img {
+  margin: 0 auto;
   width: 100%;
-  height: auto;
-  display: block;
+  /* Keep a comfortable max width for very large screens */
+  max-width: 1400px;
 }
 
+/* Each photo item in the list centers and limits width so images scale predictably */
+.photo {
+  width: 100%;
+  display: block;
+  text-align: center;
+}
+
+/* Constrain image so a vertical image will fit entirely in viewport.
+   Use both max-height and max-width with object-fit: contain to preserve aspect ratio. */
+.photo img {
+  display: block;
+  margin: 0 auto;
+  width: auto;
+  max-width: 100vw;                     /* never overflow viewport width */
+  max-height: calc(100vh - 6rem);       /* leave space for header/footer/padding */
+  object-fit: contain;
+}
+
+/* Title below thumbnail */
 .photo h2 {
-  margin: 0.5rem 0 0;
-  font-size: 0.9rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.95rem;
   font-weight: 500;
   text-align: center;
+  color: #fff;
 }
 
+/* Single-photo view: make the image fill the browser area while preserving aspect ratio.
+   We'll center it both horizontally and vertically, and allow caption below (optional). */
 .single-photo {
-  padding: 2rem;
-  max-width: 1200px;
+  min-height: calc(100vh - 4rem); /* allow header/footer space */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   margin: 0 auto;
+  width: 100%;
 }
 
+/* The figure occupies the available viewport area for precise centering */
 .single-photo figure {
   margin: 0;
-}
-
-.single-photo img {
   width: 100%;
-  height: auto;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
-.single-photo figcaption {
+/* Fit the photo to the browser entirely (contain to preserve full image) */
+.single-photo img {
+  display: block;
+  max-width: 100vw;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Caption styling on dark background */
+.single-photo figcaption,
+.single-photo .caption,
+.photo figcaption {
   margin-top: 1rem;
   font-size: 0.95rem;
-  color: #555;
+  color: rgba(255,255,255,0.95);
   text-align: center;
+  line-height: 1.4;
+  /* Optional subtle backdrop for readability on top of dark photographs */
+  background: rgba(0,0,0,0.35);
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+}
+
+/* Footer small note color */
+footer p {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.9rem;
+}
+
+/* A11y focus outline */
+:focus {
+  outline: 3px solid rgba(255,255,255,0.12);
+  outline-offset: 2px;
+}
+
+/* Responsive tweaks */
+@media (max-width: 640px) {
+  .photo img,
+  .single-photo img {
+    max-height: calc(100vh - 5.5rem);
+  }
+  .photo h2 { font-size: 0.9rem; }
 }
