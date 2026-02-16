@@ -38,8 +38,7 @@
         ?>
 
         <?php if (!empty($collected)): ?>
-          <div class="photo-tags-wrap" aria-labelledby="tags-heading">
-            <h3 id="tags-heading" class="tags-heading">Tags</h3>
+          <div class="photo-tags-wrap">
             <ul class="photo-tags">
               <?php foreach ($collected as $ct): ?>
                 <li><a href="<?php echo esc_url($ct['link']); ?>" rel="tag"><?php echo esc_html($ct['name']); ?></a></li>
@@ -203,14 +202,12 @@
     ?>
 
     <?php if ($newer_link || $older_link): ?>
-      <nav class="photo-nav" aria-label="Photo navigation">
-        <?php if ($newer_link): ?>
-          <a class="photo-nav-newer" href="<?php echo esc_url($newer_link); ?>" rel="prev">newer</a>
-        <?php endif; ?>
-        <?php if ($older_link): ?>
-          <a class="photo-nav-older" href="<?php echo esc_url($older_link); ?>" rel="next">older</a>
-        <?php endif; ?>
-      </nav>
+      <?php if ($newer_link): ?>
+        <a class="photo-nav-edge photo-nav-left" href="<?php echo esc_url($newer_link); ?>" aria-label="Newer photo">&lt;</a>
+      <?php endif; ?>
+      <?php if ($older_link): ?>
+        <a class="photo-nav-edge photo-nav-right" href="<?php echo esc_url($older_link); ?>" aria-label="Older photo">&gt;</a>
+      <?php endif; ?>
     <?php endif; ?>
   <?php endwhile; ?>
 </main>

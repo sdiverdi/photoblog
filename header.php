@@ -7,6 +7,7 @@
   <?php wp_head(); ?>
 </head>
 <body <?php body_class(); ?>>
+<?php if ( ! is_singular('photo') ): ?>
 <header>
   <h1>
     <a href="<?php echo esc_url(home_url('/')); ?>">
@@ -14,3 +15,4 @@
     </a>
   </h1>
 </header>
+<?php endif; ?>
