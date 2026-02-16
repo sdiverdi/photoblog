@@ -49,35 +49,50 @@ header, footer {
    - single-photo view uses .single-photo and will be full-viewport centered
 */
 
-/* Photo list (main page) — single centered column */
+/* Photo list (main page) — justified grid of recent photos */
 .photo-grid {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 1.5rem;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 1rem;
   margin: 0 auto;
   width: 100%;
-  /* Keep a comfortable max width for very large screens */
   max-width: 1400px;
+  align-items: stretch;
 }
 
-/* Each photo item in the list centers and limits width so images scale predictably */
-.photo {
-  width: 100%;
+/* Grid item: fixed row height, flexible width based on image aspect ratio (computed by JS) */
+
+/* Grid item: tiles sized by JS. Use a minimum row height and never crop images.
+   JS sets an explicit tile width and height; images are contained inside. */
+.photo-item {
+  overflow: hidden;
+  flex: 0 0 auto; /* JS will set exact width */
+  background: #070707;
+  border-radius: 4px;
   display: block;
-  text-align: center;
 }
 
-/* Constrain image so a vertical image will fit entirely in viewport.
-   Use both max-height and max-width with object-fit: contain to preserve aspect ratio. */
-.photo img {
+.photo-item a {
   display: block;
-  margin: 0 auto;
+  height: 100%;
+}
+
+.photo-item img {
+  height: 100%;
   width: auto;
-  max-width: 100vw;                     /* never overflow viewport width */
-  max-height: calc(100vh - 6rem);       /* leave space for header/footer/padding */
-  object-fit: contain;
+  display: block;
+  object-fit: contain; /* never crop */
+  margin: 0 auto;      /* center smaller images */
+}
+
+.photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0.5rem;
+  color: rgba(255,255,255,0.9);
 }
 
 /* Title below thumbnail */

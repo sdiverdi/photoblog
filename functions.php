@@ -74,4 +74,12 @@ add_action('wp_enqueue_scripts', function () {
     [],
     wp_get_theme()->get('Version')
   );
+  // Justified grid script (small, in-theme) to size grid items by image aspect ratio
+  wp_enqueue_script(
+    'photoblog-justified',
+    get_template_directory_uri() . '/assets/js/justified.js',
+    [],
+    wp_get_theme()->get('Version'),
+    true
+  );
 });

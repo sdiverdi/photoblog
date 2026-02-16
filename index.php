@@ -1,6 +1,6 @@
 <?php get_header(); ?>
 
-<main class="photo-grid">
+<main class="photo-grid" id="photo-grid">
   <?php
   $photos = new WP_Query([
     'post_type' => 'photo',
@@ -9,13 +9,18 @@
 
   while ($photos->have_posts()):
     $photos->the_post();
+    $thumb_id = get_post_thumbnail_id();
+    $thumb_url = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'large') : ''; 
   ?>
-    <article class="photo">
+    <div class="photo-item">
       <a href="<?php the_permalink(); ?>">
-        <?php the_post_thumbnail('large'); ?>
+        <?php if ($thumb_url): ?>
+          <img src="<?php echo esc_url($thumb_url); ?>" alt="<?php echo esc_attr(get_the_title()); ?>" loading="lazy" />
+        <?php else: ?>
+          <span class="photo-placeholder"><?php the_title(); ?></span>
+        <?php endif; ?>
       </a>
-      <h2><?php the_title(); ?></h2>
-    </article>
+    </div>
   <?php endwhile; wp_reset_postdata(); ?>
 </main>
 
