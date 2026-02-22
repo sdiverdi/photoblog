@@ -2,6 +2,55 @@
 
 <main class="single-photo">
   <?php while (have_posts()): the_post(); ?>
+    <?php
+      // Determine a sensible "close" target: prefer a tag index (from `from_tag` or referrer),
+      // fall back to the first tag on the post, then the site home.
+      $close_url = home_url('/');
+      $post_id = get_the_ID();
+
+      $tag_slug = '';
+      if (isset($_GET['from_tag']) && $_GET['from_tag']) {
+        $tag_slug = wp_unslash($_GET['from_tag']);
+      } else {
+        $ref = isset($_SERVER['HTTP_REFERER']) ? wp_unslash($_SERVER['HTTP_REFERER']) : '';
+        if ($ref) {
+          $path = wp_parse_url($ref, PHP_URL_PATH);
+          if ($path) {
+            $parts = explode('/', trim($path, '/'));
+            $tag_index = array_search('tag', $parts);
+            if ($tag_index !== false && isset($parts[$tag_index + 1])) {
+              $tag_slug = urldecode($parts[$tag_index + 1]);
+            }
+          }
+        }
+      }
+
+      if ($tag_slug) {
+        $post_type = get_post_type($post_id);
+        $term = false;
+        $object_taxonomies = get_object_taxonomies($post_type);
+        if (!empty($object_taxonomies)) {
+          foreach ($object_taxonomies as $tax) {
+            $t = get_term_by('slug', $tag_slug, $tax);
+            if ($t && !is_wp_error($t)) { $term = $t; break; }
+          }
+        }
+        if ((!$term || is_wp_error($term))) {
+          $t = get_term_by('slug', $tag_slug, 'post_tag');
+          if ($t && !is_wp_error($t)) $term = $t;
+        }
+        if ($term && !is_wp_error($term)) {
+          $close_url = get_term_link($term);
+        }
+      } else {
+        $tags = get_the_tags($post_id);
+        if ($tags && !is_wp_error($tags)) {
+          $close_url = get_term_link($tags[0]);
+        }
+      }
+    ?>
+
+    <a class="photo-close" href="<?php echo esc_url($close_url); ?>" aria-label="Close photo">&times;</a>
     <article class="photo-layout">
       <div class="photo-left">
         <?php if (has_post_thumbnail()): the_post_thumbnail('photo-large'); endif; ?>
