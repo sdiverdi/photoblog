@@ -103,3 +103,11 @@ function force_tags_lowercase( $data, $postarr ) {
     return $data;
 }
 add_filter( 'wp_insert_post_data', 'force_tags_lowercase', 99, 2 );
+
+function modify_post_type_admin_bar( $args, $post_type ) {
+    if ( 'photo' !== $post_type ) {
+        $args['show_in_admin_bar'] = false;
+    }
+    return $args;
+}
+add_filter( 'register_post_type_args', 'modify_post_type_admin_bar', 10, 2 );
