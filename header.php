@@ -24,5 +24,57 @@
       <?php bloginfo('name'); ?>
     </a>
   </h1>
+  <?php
+    if ( is_home() || is_tag() || is_tax() || get_query_var('tag') ) :
+      $tag_slugs = array('steve','gabby','zoe');
+      $filters = array();
+      $filters['everyone'] = array(
+        'label' => 'Everyone',
+        'link'  => esc_url( home_url('/') ),
+      );
+      foreach ( $tag_slugs as $s ) {
+        $term = get_term_by('slug', $s, 'post_tag');
+        if ( $term ) {
+          $link = get_tag_link( $term->term_id );
+        } else {
+          $tag_base = get_option( 'tag_base' );
+          if ( ! $tag_base ) {
+            $tag_base = 'tag';
+          }
+          $link = home_url( user_trailingslashit( $tag_base . '/' . rawurlencode( $s ) ) );
+        }
+        $filters[$s] = array(
+          'label' => ucfirst($s),
+          'link'  => $link,
+        );
+      }
+
+      $current = 'everyone';
+      // Prefer explicit taxonomy/tag queries
+      if ( is_tag() || is_tax() ) {
+        $queried = get_queried_object();
+        if ( $queried && isset($queried->slug) ) {
+          $current = $queried->slug;
+        }
+      } elseif ( get_query_var('tag') ) {
+        $current = get_query_var('tag');
+      }
+
+      echo '<p class="now-showing">Now showing: ';
+      foreach ( $filters as $slug => $f ) {
+        $class = 'now-showing__item';
+        if ( $slug === $current ) {
+          $class .= ' active';
+        }
+
+        if ( $slug === $current ) {
+          echo '<span class="' . esc_attr($class) . '">' . esc_html( $f['label'] ) . '</span> ';
+        } else {
+          echo '<a class="' . esc_attr($class) . '" href="' . esc_url( $f['link'] ) . '">' . esc_html( $f['label'] ) . '</a> ';
+        }
+      }
+      echo '</p>';
+    endif;
+  ?>
 </header>
 <?php endif; ?>
