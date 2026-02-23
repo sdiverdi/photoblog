@@ -70,12 +70,31 @@
     $photos->the_post();
     $thumb_id = get_post_thumbnail_id();
     $thumb_url = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'large') : ''; 
+    // Determine small lower-right label based on tags/terms (steve, zoe, gabby)
+    $photo_label = '';
+    $label_candidates = array('steve', 'zoe', 'gabby');
+    $photo_taxonomies_for_labels = get_object_taxonomies('photo');
+    foreach ($photo_taxonomies_for_labels as $ptax) {
+      $terms = get_the_terms(get_the_ID(), $ptax);
+      if ($terms && !is_wp_error($terms)) {
+        foreach ($terms as $t) {
+          $slug = strtolower($t->slug);
+          if (in_array($slug, $label_candidates, true)) {
+            $photo_label = $slug;
+            break 2;
+          }
+        }
+      }
+    }
   ?>
     <div class="photo-item">
       <?php $link = get_permalink(); if ($archive_tag_slug) { $link = add_query_arg('from_tag', rawurlencode($archive_tag_slug), $link); } ?>
       <a href="<?php echo esc_url($link); ?>">
         <?php if ($thumb_url): ?>
           <img src="<?php echo esc_url($thumb_url); ?>" alt="<?php echo esc_attr(get_the_title()); ?>" loading="lazy" />
+          <?php if ($photo_label): ?>
+            <span class="photo-label"><span class="photo-label-text"><?php echo esc_html($photo_label); ?></span></span>
+          <?php endif; ?>
         <?php else: ?>
           <span class="photo-placeholder"><?php the_title(); ?></span>
         <?php endif; ?>

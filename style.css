@@ -66,6 +66,7 @@ header, footer {
 /* Grid item: tiles sized by JS. Use a minimum row height and never crop images.
    JS sets an explicit tile width and height; images are contained inside. */
 .photo-item {
+  position: relative;
   overflow: hidden;
   flex: 0 0 auto; /* JS will set exact width */
   background: #070707;
@@ -84,6 +85,33 @@ header, footer {
   display: block;
   object-fit: contain; /* never crop */
   margin: 0 auto;      /* center smaller images */
+}
+
+/* Small lower-right label for photo author/tag */
+.photo-label {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 0.75rem;
+  /* fixed height + flex centering for pixel-perfect vertical centering */
+  height: 18px; /* explicitly match the small visual badge height */
+  line-height: normal;
+  padding: 0 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  text-transform: none;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Optical nudge: lift the text slightly so ascenders/descenders appear visually centered */
+.photo-label-text {
+  display: inline-block;
+  transform: translateY(-0.08em);
 }
 
 .photo-placeholder {
