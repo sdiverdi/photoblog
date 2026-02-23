@@ -135,7 +135,10 @@ header, footer {
 /* Single-photo view: make the image fill the browser area while preserving aspect ratio.
    We'll center it both horizontally and vertically, and allow caption below (optional). */
 .single-photo {
-  min-height: calc(100vh - 4rem); /* allow header/footer space */
+  /* Force single-photo view to exactly match the viewport on desktop
+     and hide any vertical overflow so no vertical scrollbar appears. */
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -477,4 +480,21 @@ footer p {
   font-weight: 700;
   text-decoration: underline;
   color: #fff;
+}
+
+/* Mobile: allow a single tap to hide/show overlays (close, info, nav) */
+@media (max-width: 640px) {
+  .single-photo .photo-close,
+  .single-photo .photo-info,
+  .single-photo .photo-nav-edge {
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .single-photo.overlays-hidden .photo-close,
+  .single-photo.overlays-hidden .photo-info,
+  .single-photo.overlays-hidden .photo-nav-edge {
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+  }
 }

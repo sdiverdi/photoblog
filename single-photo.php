@@ -261,4 +261,108 @@
   <?php endwhile; ?>
 </main>
 
+<script>
+  (function(){
+    function initToggleAndSwipe(){
+      var mq = window.matchMedia('(max-width: 640px)');
+      var container = document.querySelector('main.single-photo');
+      if (!container) return;
+      var imageArea = container.querySelector('.photo-left');
+      if (!imageArea) return;
+
+      // Avoid attaching multiple times
+      if (imageArea._photoControlsAttached) return;
+      imageArea._photoControlsAttached = true;
+
+      container._lastTouchWasSwipe = false;
+
+      imageArea.addEventListener('click', function(e){
+        if (!mq.matches) return;
+        // If a swipe just happened, ignore the click
+        if (container._lastTouchWasSwipe) { container._lastTouchWasSwipe = false; return; }
+        if (e.target.closest('a,button')) return;
+        container.classList.toggle('overlays-hidden');
+        try {
+          if (container.classList.contains('overlays-hidden')) {
+            sessionStorage.setItem('photoblog_overlays_hidden', '1');
+          } else {
+            sessionStorage.removeItem('photoblog_overlays_hidden');
+          }
+        } catch (err){ /* ignore storage errors */ }
+      }, false);
+
+      var startX = 0, startY = 0, distX = 0, distY = 0, startTime = 0;
+      var threshold = 50; // minimum px for swipe
+      var allowedTime = 500; // maximum ms for a swipe
+
+      imageArea.addEventListener('touchstart', function(e){
+        if (!mq.matches) return;
+        var t = e.touches[0];
+        startX = t.clientX; startY = t.clientY; startTime = Date.now();
+        distX = 0; distY = 0;
+      }, false);
+
+      imageArea.addEventListener('touchmove', function(e){
+        if (!mq.matches) return;
+        var t = e.touches[0];
+        distX = t.clientX - startX;
+        distY = t.clientY - startY;
+      }, false);
+
+      imageArea.addEventListener('touchend', function(e){
+        if (!mq.matches) return;
+        var elapsed = Date.now() - startTime;
+        if (elapsed <= allowedTime && Math.abs(distX) >= threshold && Math.abs(distX) > Math.abs(distY)) {
+          // horizontal swipe detected
+          var navRight = container.querySelector('.photo-nav-right');
+          var navLeft = container.querySelector('.photo-nav-left');
+          if (distX < 0) {
+            // swipe left -> go to older (right nav)
+            if (navRight && navRight.href) {
+              try { if (container.classList.contains('overlays-hidden')) sessionStorage.setItem('photoblog_overlays_hidden','1'); else sessionStorage.removeItem('photoblog_overlays_hidden'); } catch(e){}
+              container._lastTouchWasSwipe = true;
+              window.location = navRight.href;
+              return;
+            }
+          } else {
+            // swipe right -> go to newer (left nav)
+            if (navLeft && navLeft.href) {
+              try { if (container.classList.contains('overlays-hidden')) sessionStorage.setItem('photoblog_overlays_hidden','1'); else sessionStorage.removeItem('photoblog_overlays_hidden'); } catch(e){}
+              container._lastTouchWasSwipe = true;
+              window.location = navLeft.href;
+              return;
+            }
+          }
+        }
+        // Reset swipe flag shortly after touch end so click can work next
+        setTimeout(function(){ container._lastTouchWasSwipe = false; }, 50);
+      }, false);
+
+      // Ensure clicking nav links preserves the overlay state
+      var navEdges = container.querySelectorAll('.photo-nav-edge');
+      if (navEdges && navEdges.length) {
+        navEdges.forEach(function(a){
+          a.addEventListener('click', function(){
+            try { if (container.classList.contains('overlays-hidden')) sessionStorage.setItem('photoblog_overlays_hidden','1'); else sessionStorage.removeItem('photoblog_overlays_hidden'); } catch(e){}
+          }, false);
+        });
+      }
+
+      // Apply stored state on load
+      try {
+        if (sessionStorage.getItem('photoblog_overlays_hidden') === '1') {
+          container.classList.add('overlays-hidden');
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initToggleAndSwipe);
+    } else {
+      initToggleAndSwipe();
+    }
+    window.addEventListener('resize', initToggleAndSwipe);
+  })();
+</script>
+
 <?php get_footer(); ?>
