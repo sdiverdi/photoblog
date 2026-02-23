@@ -83,3 +83,23 @@ add_action('wp_enqueue_scripts', function () {
     true
   );
 });
+
+// Remove Add Media button from add photo page.
+add_filter( 'wp_editor_settings', function( $settings ) {
+    $screen = get_current_screen();
+    if ( $screen && $screen->post_type == 'photo' ) {
+        $settings['media_buttons'] = false;
+    }
+    return $settings;
+});
+
+// Make tags lowercase only
+function force_tags_lowercase( $data, $postarr ) {
+    if ( isset( $_POST['tags_input'] ) ) {
+        $tags = explode( ',', $_POST['tags_input'] );
+        $lowercase_tags = array_map( 'strtolower', $tags );
+        $_POST['tags_input'] = implode( ',', $lowercase_tags );
+    }
+    return $data;
+}
+add_filter( 'wp_insert_post_data', 'force_tags_lowercase', 99, 2 );
