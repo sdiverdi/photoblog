@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function loadNextPage() {
     if (isLoading || currentPage >= maxPages || !config.ajaxUrl) {
-      return;
+      return false;
     }
 
     isLoading = true;
@@ -261,8 +261,10 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       updateStatus('', 'idle');
+      return true;
     } catch (error) {
       updateStatus('Could not load more photos. Keep scrolling to retry.', 'error');
+      return false;
     } finally {
       isLoading = false;
     }
@@ -311,10 +313,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     let targetItem = getPhotoItem(targetPhotoId);
+    const minimumTargetPage = !Number.isNaN(targetPage) && targetPage > 1 ? targetPage : 1;
 
-    while (!targetItem && currentPage < maxPages && (!targetPage || currentPage < targetPage)) {
-      await loadNextPage();
+    while (!targetItem && currentPage < maxPages) {
+      const loaded = await loadNextPage();
+      if (!loaded) {
+        break;
+      }
       targetItem = getPhotoItem(targetPhotoId);
+
+      if (targetItem && currentPage >= minimumTargetPage) {
+        break;
+      }
     }
 
     if (targetItem) {
