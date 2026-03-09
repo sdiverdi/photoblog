@@ -1,8 +1,14 @@
 document.addEventListener('DOMContentLoaded', function () {
   const grid = document.getElementById('photo-grid');
   if (!grid) return;
-
-  const items = Array.from(grid.querySelectorAll('.photo-item'));
+  const sentinel = document.getElementById('photo-grid-sentinel');
+  const status = document.getElementById('photo-grid-status');
+  const config = window.photoblogGrid || {};
+  let currentPage = parseInt(grid.dataset.currentPage || '1', 10);
+  let maxPages = parseInt(grid.dataset.maxPages || '1', 10);
+  let isLoading = false;
+  let observer = null;
+  let scrollFallbackAttached = false;
 
   // Configuration: minimum row height and responsive breakpoints
   const MIN_ROW_HEIGHT = 120; // px - never go below this
@@ -16,8 +22,53 @@ document.addEventListener('DOMContentLoaded', function () {
     return Math.max(MIN_ROW_HEIGHT, DEFAULT_ROW_HEIGHT);
   }
 
+  function getItems() {
+    return Array.from(grid.querySelectorAll('.photo-item'));
+  }
+
+  function updateStatus(message, state) {
+    if (!status) return;
+
+    const label = status.querySelector('.photo-grid-status__message');
+    status.dataset.state = state || '';
+    status.hidden = !message;
+
+    if (label) {
+      label.textContent = message || '';
+    }
+  }
+
+  function stopInfiniteScroll() {
+    if (observer) {
+      observer.disconnect();
+      observer = null;
+    }
+
+    if (scrollFallbackAttached) {
+      window.removeEventListener('scroll', onScrollFallback);
+      scrollFallbackAttached = false;
+    }
+  }
+
+  function attachImageListeners(scope) {
+    const images = Array.from((scope || grid).querySelectorAll('img'));
+
+    images.forEach(img => {
+      if (img.dataset.layoutBound === 'true') return;
+      img.dataset.layoutBound = 'true';
+
+      if (!img.complete) {
+        img.addEventListener('load', scheduleCompute, { once: true });
+        img.addEventListener('error', scheduleCompute, { once: true });
+      }
+    });
+  }
+
   // compute a justified layout: group items into rows and increase row height so row widths fill container
   function computeLayout() {
+    const items = getItems();
+    if (!items.length) return;
+
     const gap = parseInt(getComputedStyle(grid).gap) || 8;
     const containerWidth = grid.clientWidth * 0.95;
     const MIN_W = 60;
@@ -120,12 +171,122 @@ document.addEventListener('DOMContentLoaded', function () {
     window._photoblog_compute_timer = setTimeout(computeLayout, 80);
   }
 
-  items.forEach(d => {
-    const img = d.querySelector ? d.querySelector('img') : null;
-    if (img && !img.complete) img.addEventListener('load', scheduleCompute);
-  });
+  async function loadNextPage() {
+    if (isLoading || currentPage >= maxPages || !config.ajaxUrl) {
+      return;
+    }
+
+    isLoading = true;
+    updateStatus('Loading more photos...', 'loading');
+
+    try {
+      const nextPage = currentPage + 1;
+      const body = new URLSearchParams();
+      body.set('action', 'photoblog_load_more_photos');
+      body.set('nonce', config.nonce || '');
+      body.set('page', String(nextPage));
+
+      if (grid.dataset.taxonomy) {
+        body.set('taxonomy', grid.dataset.taxonomy);
+      }
+
+      if (grid.dataset.termSlug) {
+        body.set('termSlug', grid.dataset.termSlug);
+      }
+
+      if (grid.dataset.tagSlug) {
+        body.set('tagSlug', grid.dataset.tagSlug);
+      }
+
+      const response = await fetch(config.ajaxUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        },
+        body: body.toString()
+      });
+
+      if (!response.ok) {
+        throw new Error('Request failed');
+      }
+
+      const payload = await response.json();
+      if (!payload || !payload.success || !payload.data) {
+        throw new Error('Invalid response');
+      }
+
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = payload.data.html || '';
+
+      const newItems = Array.from(wrapper.children).filter(node => {
+        return node.nodeType === Node.ELEMENT_NODE && node.classList.contains('photo-item');
+      });
+
+      currentPage = nextPage;
+      maxPages = parseInt(payload.data.maxPages || maxPages, 10) || maxPages;
+
+      if (newItems.length) {
+        const fragment = document.createDocumentFragment();
+        newItems.forEach(item => fragment.appendChild(item));
+        grid.appendChild(fragment);
+        attachImageListeners(grid);
+        scheduleCompute();
+      }
+
+      if (!payload.data.hasMore || currentPage >= maxPages) {
+        stopInfiniteScroll();
+      }
+
+      updateStatus('', 'idle');
+    } catch (error) {
+      updateStatus('Could not load more photos. Keep scrolling to retry.', 'error');
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  function onScrollFallback() {
+    if (!sentinel || isLoading || currentPage >= maxPages) {
+      return;
+    }
+
+    const threshold = window.innerHeight * 1.5;
+    const sentinelTop = sentinel.getBoundingClientRect().top;
+
+    if (sentinelTop <= threshold) {
+      loadNextPage();
+    }
+  }
+
+  function startInfiniteScroll() {
+    if (!sentinel || currentPage >= maxPages) {
+      return;
+    }
+
+    if ('IntersectionObserver' in window) {
+      observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            loadNextPage();
+          }
+        });
+      }, {
+        rootMargin: '600px 0px'
+      });
+
+      observer.observe(sentinel);
+      return;
+    }
+
+    window.addEventListener('scroll', onScrollFallback, { passive: true });
+    scrollFallbackAttached = true;
+  }
+
+  attachImageListeners(grid);
 
   computeLayout();
+  startInfiniteScroll();
 
   window.addEventListener('resize', scheduleCompute);
   window.addEventListener('orientationchange', scheduleCompute);

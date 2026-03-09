@@ -1,106 +1,31 @@
 <?php get_header(); ?>
 
-<main class="photo-grid" id="photo-grid">
+<?php
+$listing_context = photoblog_get_photo_listing_context();
+$photos = new WP_Query( $listing_context['query_args'] );
+$current_page = isset( $listing_context['query_args']['paged'] ) ? (int) $listing_context['query_args']['paged'] : 1;
+$max_pages = (int) $photos->max_num_pages;
+?>
+
+<main
+  class="photo-grid"
+  id="photo-grid"
+  data-current-page="<?php echo esc_attr( $current_page ); ?>"
+  data-max-pages="<?php echo esc_attr( $max_pages ); ?>"
+  data-taxonomy="<?php echo esc_attr( $listing_context['taxonomy'] ); ?>"
+  data-term-slug="<?php echo esc_attr( $listing_context['term_slug'] ); ?>"
+  data-tag-slug="<?php echo esc_attr( $listing_context['tag_slug'] ); ?>"
+>
   <?php
-  // Photo grid query — handles archives and the main listing
-  // If a tag query var is present, treat this as a tag archive and query photos with that tag
-  $archive_tag_slug = '';
-  if ( get_query_var('tag') ) {
-    $tag_slug = get_query_var('tag');
-    $archive_tag_slug = $tag_slug;
-    // Search for a matching term within taxonomies attached to the 'photo' post type
-    $photo_taxonomies = get_object_taxonomies('photo');
-    $tax_query = array();
-    $found = false;
-    foreach ($photo_taxonomies as $ptax) {
-      $term = get_term_by('slug', $tag_slug, $ptax);
-      if ($term && !is_wp_error($term)) {
-        $found = true;
-        $tax_query[] = array(
-          'taxonomy' => $ptax,
-          'field' => 'slug',
-          'terms' => $tag_slug,
-        );
-        break;
-      }
-    }
-
-    if ($found) {
-      $photos = new WP_Query([
-        'post_type' => 'photo',
-        'posts_per_page' => 24,
-        'tax_query' => $tax_query,
-      ]);
-    } else {
-      // No matching term for photos — return empty result set
-      $photos = new WP_Query([
-        'post_type' => 'photo',
-        'posts_per_page' => 24,
-        'post__in' => array(0),
-      ]);
-    }
-
-  // If we're on a custom taxonomy archive, use a tax_query targeting the current term
-  } elseif ( is_tax() ) {
-    $term = get_queried_object();
-    // If this taxonomy is attached to photos, remember the slug so links can carry context
-    $photo_taxonomies = get_object_taxonomies('photo');
-    if (in_array($term->taxonomy, $photo_taxonomies)) {
-      $archive_tag_slug = $term->slug;
-    }
-    $photos = new WP_Query([
-      'post_type' => 'photo',
-      'posts_per_page' => 24,
-      'tax_query' => [[
-        'taxonomy' => $term->taxonomy,
-        'field' => 'slug',
-        'terms' => $term->slug,
-      ]],
-    ]);
-
-  // Fallback: default photo listing
-  } else {
-    $photos = new WP_Query([
-      'post_type' => 'photo',
-      'posts_per_page' => 24,
-    ]);
-  }
-
-  while ($photos->have_posts()):
-    $photos->the_post();
-    $thumb_id = get_post_thumbnail_id();
-    $thumb_url = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'large') : ''; 
-    // Determine small lower-right label based on tags/terms (steve, zoe, gabby)
-    $photo_label = '';
-    $label_candidates = array('steve', 'zoe', 'gabby');
-    $photo_taxonomies_for_labels = get_object_taxonomies('photo');
-    foreach ($photo_taxonomies_for_labels as $ptax) {
-      $terms = get_the_terms(get_the_ID(), $ptax);
-      if ($terms && !is_wp_error($terms)) {
-        foreach ($terms as $t) {
-          $slug = strtolower($t->slug);
-          if (in_array($slug, $label_candidates, true)) {
-            $photo_label = $slug;
-            break 2;
-          }
-        }
-      }
-    }
+  echo photoblog_render_photo_grid_items( $photos, $listing_context['archive_tag_slug'] );
+  wp_reset_postdata();
   ?>
-    <div class="photo-item">
-      <?php $link = get_permalink(); if ($archive_tag_slug) { $link = add_query_arg('from_tag', rawurlencode($archive_tag_slug), $link); } ?>
-      <a href="<?php echo esc_url($link); ?>">
-        <?php if ($thumb_url): ?>
-          <img src="<?php echo esc_url($thumb_url); ?>" alt="<?php echo esc_attr(get_the_title()); ?>" loading="lazy" />
-          <?php if ($photo_label): ?>
-            <span class="photo-label"><span class="photo-label-text"><?php echo esc_html($photo_label); ?></span></span>
-          <?php endif; ?>
-        <?php else: ?>
-          <span class="photo-placeholder"><?php the_title(); ?></span>
-        <?php endif; ?>
-      </a>
-    </div>
-  <?php endwhile; wp_reset_postdata(); ?>
 </main>
+
+<div class="photo-grid-status" id="photo-grid-status" aria-live="polite">
+  <span class="photo-grid-status__message"></span>
+</div>
+
+<div class="photo-grid-sentinel" id="photo-grid-sentinel" aria-hidden="true"></div>
 
 <?php get_footer(); ?>

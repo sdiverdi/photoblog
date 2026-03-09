@@ -1,5 +1,152 @@
 <?php
 
+function photoblog_get_photos_per_page() {
+  return 24;
+}
+
+function photoblog_get_photo_listing_context( $args = array() ) {
+  $photo_taxonomies = get_object_taxonomies( 'photo' );
+  $paged = 1;
+
+  if ( isset( $args['paged'] ) ) {
+    $paged = max( 1, absint( $args['paged'] ) );
+  } else {
+    $paged = max( 1, absint( get_query_var( 'paged' ) ), absint( get_query_var( 'page' ) ) );
+  }
+
+  $context = array(
+    'archive_tag_slug' => '',
+    'taxonomy' => '',
+    'term_slug' => '',
+    'tag_slug' => '',
+    'query_args' => array(
+      'post_type' => 'photo',
+      'posts_per_page' => photoblog_get_photos_per_page(),
+      'paged' => $paged,
+    ),
+  );
+
+  $tag_slug = '';
+  if ( array_key_exists( 'tag_slug', $args ) ) {
+    $tag_slug = sanitize_title( $args['tag_slug'] );
+  } elseif ( get_query_var( 'tag' ) ) {
+    $tag_slug = sanitize_title( get_query_var( 'tag' ) );
+  }
+
+  if ( $tag_slug ) {
+    $context['archive_tag_slug'] = $tag_slug;
+    $context['tag_slug'] = $tag_slug;
+
+    foreach ( $photo_taxonomies as $photo_taxonomy ) {
+      $term = get_term_by( 'slug', $tag_slug, $photo_taxonomy );
+      if ( $term && ! is_wp_error( $term ) ) {
+        $context['taxonomy'] = $photo_taxonomy;
+        $context['term_slug'] = $tag_slug;
+        $context['query_args']['tax_query'] = array(
+          array(
+            'taxonomy' => $photo_taxonomy,
+            'field' => 'slug',
+            'terms' => $tag_slug,
+          ),
+        );
+
+        return $context;
+      }
+    }
+
+    $context['query_args']['post__in'] = array( 0 );
+
+    return $context;
+  }
+
+  $taxonomy = isset( $args['taxonomy'] ) ? sanitize_key( $args['taxonomy'] ) : '';
+  $term_slug = isset( $args['term_slug'] ) ? sanitize_title( $args['term_slug'] ) : '';
+
+  if ( ( ! $taxonomy || ! $term_slug ) && is_tax() ) {
+    $term = get_queried_object();
+    if ( $term && isset( $term->taxonomy, $term->slug ) && in_array( $term->taxonomy, $photo_taxonomies, true ) ) {
+      $taxonomy = $term->taxonomy;
+      $term_slug = $term->slug;
+    }
+  }
+
+  if ( $taxonomy && $term_slug && in_array( $taxonomy, $photo_taxonomies, true ) ) {
+    $context['archive_tag_slug'] = $term_slug;
+    $context['taxonomy'] = $taxonomy;
+    $context['term_slug'] = $term_slug;
+    $context['query_args']['tax_query'] = array(
+      array(
+        'taxonomy' => $taxonomy,
+        'field' => 'slug',
+        'terms' => $term_slug,
+      ),
+    );
+  }
+
+  return $context;
+}
+
+function photoblog_get_photo_label( $post_id ) {
+  $label_candidates = array( 'steve', 'zoe', 'gabby' );
+  $photo_taxonomies = get_object_taxonomies( 'photo' );
+
+  foreach ( $photo_taxonomies as $photo_taxonomy ) {
+    $terms = get_the_terms( $post_id, $photo_taxonomy );
+    if ( ! $terms || is_wp_error( $terms ) ) {
+      continue;
+    }
+
+    foreach ( $terms as $term ) {
+      $slug = strtolower( $term->slug );
+      if ( in_array( $slug, $label_candidates, true ) ) {
+        return $slug;
+      }
+    }
+  }
+
+  return '';
+}
+
+function photoblog_get_photo_item_markup( $post_id, $archive_tag_slug = '' ) {
+  $thumb_id = get_post_thumbnail_id( $post_id );
+  $thumb_url = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'large' ) : '';
+  $photo_label = photoblog_get_photo_label( $post_id );
+  $link = get_permalink( $post_id );
+
+  if ( $archive_tag_slug ) {
+    $link = add_query_arg( 'from_tag', rawurlencode( $archive_tag_slug ), $link );
+  }
+
+  ob_start();
+  ?>
+  <div class="photo-item">
+    <a href="<?php echo esc_url( $link ); ?>">
+    <?php if ( $thumb_url ) : ?>
+      <img src="<?php echo esc_url( $thumb_url ); ?>" alt="<?php echo esc_attr( get_the_title( $post_id ) ); ?>" loading="lazy" />
+      <?php if ( $photo_label ) : ?>
+      <span class="photo-label"><span class="photo-label-text"><?php echo esc_html( $photo_label ); ?></span></span>
+      <?php endif; ?>
+    <?php else : ?>
+      <span class="photo-placeholder"><?php echo esc_html( get_the_title( $post_id ) ); ?></span>
+    <?php endif; ?>
+    </a>
+  </div>
+  <?php
+
+  return trim( ob_get_clean() );
+}
+
+function photoblog_render_photo_grid_items( $photos, $archive_tag_slug = '' ) {
+  ob_start();
+
+  while ( $photos->have_posts() ) {
+    $photos->the_post();
+    echo photoblog_get_photo_item_markup( get_the_ID(), $archive_tag_slug );
+  }
+
+  return ob_get_clean();
+}
+
 // Enable featured images
 add_theme_support('post-thumbnails');
 
@@ -82,7 +229,51 @@ add_action('wp_enqueue_scripts', function () {
     wp_get_theme()->get('Version'),
     true
   );
+
+  wp_localize_script(
+    'photoblog-justified',
+    'photoblogGrid',
+    [
+      'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+      'nonce' => wp_create_nonce( 'photoblog_load_more_photos' ),
+    ]
+  );
 });
+
+function photoblog_ajax_load_more_photos() {
+    check_ajax_referer( 'photoblog_load_more_photos', 'nonce' );
+
+    $page = isset( $_POST['page'] ) ? max( 1, absint( wp_unslash( $_POST['page'] ) ) ) : 1;
+    $taxonomy = isset( $_POST['taxonomy'] ) ? sanitize_key( wp_unslash( $_POST['taxonomy'] ) ) : '';
+    $term_slug = isset( $_POST['termSlug'] ) ? sanitize_title( wp_unslash( $_POST['termSlug'] ) ) : '';
+    $tag_slug = isset( $_POST['tagSlug'] ) ? sanitize_title( wp_unslash( $_POST['tagSlug'] ) ) : '';
+
+    $listing_context = photoblog_get_photo_listing_context(
+        array(
+            'paged' => $page,
+            'taxonomy' => $taxonomy,
+            'term_slug' => $term_slug,
+            'tag_slug' => $tag_slug,
+        )
+    );
+
+    $photos = new WP_Query( $listing_context['query_args'] );
+    $html = photoblog_render_photo_grid_items( $photos, $listing_context['archive_tag_slug'] );
+    $max_pages = (int) $photos->max_num_pages;
+
+    wp_reset_postdata();
+
+    wp_send_json_success(
+        array(
+            'html' => $html,
+            'page' => $page,
+            'maxPages' => $max_pages,
+            'hasMore' => $page < $max_pages,
+        )
+    );
+}
+add_action( 'wp_ajax_photoblog_load_more_photos', 'photoblog_ajax_load_more_photos' );
+add_action( 'wp_ajax_nopriv_photoblog_load_more_photos', 'photoblog_ajax_load_more_photos' );
 
 // Remove Add Media button from add photo page.
 add_filter( 'wp_editor_settings', function( $settings ) {

@@ -61,6 +61,32 @@ header, footer {
   align-items: stretch;
 }
 
+.photo-grid-status,
+.photo-grid-sentinel {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.photo-grid-status {
+  min-height: 2.5rem;
+  padding: 0 1rem 1.5rem;
+  text-align: center;
+  color: rgba(255,255,255,0.8);
+}
+
+.photo-grid-status[hidden] {
+  display: none;
+}
+
+.photo-grid-status[data-state="error"] {
+  color: #ff9d9d;
+}
+
+.photo-grid-sentinel {
+  height: 1px;
+}
+
 /* Grid item: fixed row height, flexible width based on image aspect ratio (computed by JS) */
 
 /* Grid item: tiles sized by JS. Use a minimum row height and never crop images.
