@@ -7,6 +7,7 @@
       // fall back to the first tag on the post, then the site home.
       $close_url = home_url('/');
       $post_id = get_the_ID();
+      $term = false;
 
       $tag_slug = '';
       if (isset($_GET['from_tag']) && $_GET['from_tag']) {
@@ -27,7 +28,6 @@
 
       if ($tag_slug) {
         $post_type = get_post_type($post_id);
-        $term = false;
         $object_taxonomies = get_object_taxonomies($post_type);
         if (!empty($object_taxonomies)) {
           foreach ($object_taxonomies as $tax) {
@@ -46,8 +46,28 @@
         $tags = get_the_tags($post_id);
         if ($tags && !is_wp_error($tags)) {
           $close_url = get_term_link($tags[0]);
+          $term = $tags[0];
         }
       }
+
+      $close_args = array(
+        'target_photo' => $post_id,
+      );
+
+      $close_page = photoblog_get_photo_archive_page(
+        $post_id,
+        array(
+          'taxonomy' => $term && !is_wp_error($term) ? $term->taxonomy : '',
+          'term_slug' => $term && !is_wp_error($term) ? $term->slug : '',
+          'tag_slug' => $tag_slug,
+        )
+      );
+
+      if ($close_page > 1) {
+        $close_args['target_page'] = $close_page;
+      }
+
+      $close_url = add_query_arg($close_args, $close_url);
     ?>
 
     <a class="photo-close" href="<?php echo esc_url($close_url); ?>" aria-label="Close photo">&times;</a>

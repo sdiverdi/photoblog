@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const sentinel = document.getElementById('photo-grid-sentinel');
   const status = document.getElementById('photo-grid-status');
   const config = window.photoblogGrid || {};
+  const url = new URL(window.location.href);
+  const targetPhotoId = parseInt(url.searchParams.get('target_photo') || '', 10);
+  const targetPage = parseInt(url.searchParams.get('target_page') || '', 10);
   let currentPage = parseInt(grid.dataset.currentPage || '1', 10);
   let maxPages = parseInt(grid.dataset.maxPages || '1', 10);
   let isLoading = false;
@@ -24,6 +27,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function getItems() {
     return Array.from(grid.querySelectorAll('.photo-item'));
+  }
+
+  function getPhotoItem(photoId) {
+    if (!photoId || Number.isNaN(photoId)) return null;
+    return grid.querySelector('[data-photo-id="' + photoId + '"]');
+  }
+
+  function clearReturnTarget() {
+    if (!url.searchParams.has('target_photo') && !url.searchParams.has('target_page')) {
+      return;
+    }
+
+    url.searchParams.delete('target_photo');
+    url.searchParams.delete('target_page');
+    window.history.replaceState({}, document.title, url.toString());
   }
 
   function updateStatus(message, state) {
@@ -220,7 +238,11 @@ document.addEventListener('DOMContentLoaded', function () {
       wrapper.innerHTML = payload.data.html || '';
 
       const newItems = Array.from(wrapper.children).filter(node => {
-        return node.nodeType === Node.ELEMENT_NODE && node.classList.contains('photo-item');
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+          return false;
+        }
+
+        return node.classList.contains('photo-item') || node.classList.contains('photo-group-break');
       });
 
       currentPage = nextPage;
@@ -283,10 +305,37 @@ document.addEventListener('DOMContentLoaded', function () {
     scrollFallbackAttached = true;
   }
 
-  attachImageListeners(grid);
+  async function restoreTargetPhoto() {
+    if (!targetPhotoId || Number.isNaN(targetPhotoId)) {
+      return;
+    }
 
-  computeLayout();
-  startInfiniteScroll();
+    let targetItem = getPhotoItem(targetPhotoId);
+
+    while (!targetItem && currentPage < maxPages && (!targetPage || currentPage < targetPage)) {
+      await loadNextPage();
+      targetItem = getPhotoItem(targetPhotoId);
+    }
+
+    if (targetItem) {
+      window.requestAnimationFrame(function () {
+        targetItem.scrollIntoView({ block: 'center', behavior: 'auto' });
+        clearReturnTarget();
+      });
+      return;
+    }
+
+    clearReturnTarget();
+  }
+
+  async function initGrid() {
+    attachImageListeners(grid);
+    computeLayout();
+    await restoreTargetPhoto();
+    startInfiniteScroll();
+  }
+
+  initGrid();
 
   window.addEventListener('resize', scheduleCompute);
   window.addEventListener('orientationchange', scheduleCompute);

@@ -23,6 +23,8 @@ function photoblog_get_photo_listing_context( $args = array() ) {
       'post_type' => 'photo',
       'posts_per_page' => photoblog_get_photos_per_page(),
       'paged' => $paged,
+      'orderby' => 'date',
+      'order' => 'DESC',
     ),
   );
 
@@ -107,6 +109,24 @@ function photoblog_get_photo_label( $post_id ) {
   return '';
 }
 
+function photoblog_get_photo_group_data( $post_id ) {
+  return array(
+    'key' => get_the_date( 'Y-m', $post_id ),
+    'label' => get_the_date( 'F Y', $post_id ),
+  );
+}
+
+function photoblog_get_photo_group_break_markup( $label ) {
+  ob_start();
+  ?>
+  <div class="photo-group-break" aria-label="<?php echo esc_attr( $label ); ?>">
+    <span class="photo-group-break__label"><?php echo esc_html( $label ); ?></span>
+  </div>
+  <?php
+
+  return trim( ob_get_clean() );
+}
+
 function photoblog_get_photo_item_markup( $post_id, $archive_tag_slug = '' ) {
   $thumb_id = get_post_thumbnail_id( $post_id );
   $thumb_url = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'large' ) : '';
@@ -119,7 +139,7 @@ function photoblog_get_photo_item_markup( $post_id, $archive_tag_slug = '' ) {
 
   ob_start();
   ?>
-  <div class="photo-item">
+  <div class="photo-item" id="photo-<?php echo esc_attr( $post_id ); ?>" data-photo-id="<?php echo esc_attr( $post_id ); ?>">
     <a href="<?php echo esc_url( $link ); ?>">
     <?php if ( $thumb_url ) : ?>
       <img src="<?php echo esc_url( $thumb_url ); ?>" alt="<?php echo esc_attr( get_the_title( $post_id ) ); ?>" loading="lazy" />
@@ -136,15 +156,86 @@ function photoblog_get_photo_item_markup( $post_id, $archive_tag_slug = '' ) {
   return trim( ob_get_clean() );
 }
 
-function photoblog_render_photo_grid_items( $photos, $archive_tag_slug = '' ) {
+function photoblog_render_photo_grid_items( $photos, $archive_tag_slug = '', $starting_group_key = '' ) {
   ob_start();
+  $last_group_key = $starting_group_key;
 
   while ( $photos->have_posts() ) {
     $photos->the_post();
+    $group = photoblog_get_photo_group_data( get_the_ID() );
+    if ( $group['key'] !== $last_group_key ) {
+      echo photoblog_get_photo_group_break_markup( $group['label'] );
+      $last_group_key = $group['key'];
+    }
     echo photoblog_get_photo_item_markup( get_the_ID(), $archive_tag_slug );
   }
 
   return ob_get_clean();
+}
+
+function photoblog_get_previous_photo_group_key( $listing_context ) {
+  $query_args = isset( $listing_context['query_args'] ) ? $listing_context['query_args'] : array();
+  $paged = isset( $query_args['paged'] ) ? max( 1, absint( $query_args['paged'] ) ) : 1;
+
+  if ( $paged <= 1 ) {
+    return '';
+  }
+
+  $previous_offset = ( ( $paged - 1 ) * photoblog_get_photos_per_page() ) - 1;
+  if ( $previous_offset < 0 ) {
+    return '';
+  }
+
+  unset( $query_args['paged'] );
+  $query_args['posts_per_page'] = 1;
+  $query_args['offset'] = $previous_offset;
+  $query_args['fields'] = 'ids';
+  $query_args['no_found_rows'] = true;
+
+  $previous_posts = get_posts( $query_args );
+  if ( empty( $previous_posts ) ) {
+    return '';
+  }
+
+  $group = photoblog_get_photo_group_data( $previous_posts[0] );
+
+  return $group['key'];
+}
+
+function photoblog_get_photo_archive_page( $post_id, $args = array() ) {
+  $listing_context = photoblog_get_photo_listing_context(
+    array(
+      'taxonomy' => isset( $args['taxonomy'] ) ? $args['taxonomy'] : '',
+      'term_slug' => isset( $args['term_slug'] ) ? $args['term_slug'] : '',
+      'tag_slug' => isset( $args['tag_slug'] ) ? $args['tag_slug'] : '',
+      'paged' => 1,
+    )
+  );
+
+  $query_args = array(
+    'post_type' => 'photo',
+    'posts_per_page' => -1,
+    'fields' => 'ids',
+    'orderby' => 'date',
+    'order' => 'DESC',
+  );
+
+  if ( isset( $listing_context['query_args']['tax_query'] ) ) {
+    $query_args['tax_query'] = $listing_context['query_args']['tax_query'];
+  }
+
+  if ( isset( $listing_context['query_args']['post__in'] ) ) {
+    $query_args['post__in'] = $listing_context['query_args']['post__in'];
+  }
+
+  $post_ids = get_posts( $query_args );
+  $post_index = array_search( (int) $post_id, $post_ids, true );
+
+  if ( false === $post_index ) {
+    return 1;
+  }
+
+  return (int) floor( $post_index / photoblog_get_photos_per_page() ) + 1;
 }
 
 // Enable featured images
@@ -258,7 +349,8 @@ function photoblog_ajax_load_more_photos() {
     );
 
     $photos = new WP_Query( $listing_context['query_args'] );
-    $html = photoblog_render_photo_grid_items( $photos, $listing_context['archive_tag_slug'] );
+    $starting_group_key = photoblog_get_previous_photo_group_key( $listing_context );
+    $html = photoblog_render_photo_grid_items( $photos, $listing_context['archive_tag_slug'], $starting_group_key );
     $max_pages = (int) $photos->max_num_pages;
 
     wp_reset_postdata();
