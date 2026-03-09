@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let isLoading = false;
   let observer = null;
   let scrollFallbackAttached = false;
+  let targetVisibilityTimer = null;
 
   // Configuration: minimum row height and responsive breakpoints
   const MIN_ROW_HEIGHT = 120; // px - never go below this
@@ -35,6 +36,11 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function clearReturnTarget() {
+    if (targetVisibilityTimer) {
+      window.clearTimeout(targetVisibilityTimer);
+      targetVisibilityTimer = null;
+    }
+
     if (!url.searchParams.has('target_photo') && !url.searchParams.has('target_page')) {
       return;
     }
@@ -42,6 +48,43 @@ document.addEventListener('DOMContentLoaded', function () {
     url.searchParams.delete('target_photo');
     url.searchParams.delete('target_page');
     window.history.replaceState({}, document.title, url.toString());
+  }
+
+  function getTargetVisibility(targetItem) {
+    const rect = targetItem.getBoundingClientRect();
+
+    return {
+      rect,
+      inViewport: rect.top < window.innerHeight && rect.bottom > 0,
+      nearCenter: Math.abs(((rect.top + rect.bottom) / 2) - (window.innerHeight / 2)) < (window.innerHeight * 0.35)
+    };
+  }
+
+  function keepTargetInView(remainingChecks) {
+    if (!targetPhotoId || Number.isNaN(targetPhotoId)) {
+      clearReturnTarget();
+      return;
+    }
+
+    const targetItem = getPhotoItem(targetPhotoId);
+    if (!targetItem) {
+      clearReturnTarget();
+      return;
+    }
+
+    const visibility = getTargetVisibility(targetItem);
+    if (!visibility.inViewport || !visibility.nearCenter) {
+      targetItem.scrollIntoView({ block: 'center', behavior: 'auto' });
+    }
+
+    if (remainingChecks <= 0) {
+      clearReturnTarget();
+      return;
+    }
+
+    targetVisibilityTimer = window.setTimeout(function () {
+      keepTargetInView(remainingChecks - 1);
+    }, 180);
   }
 
   function updateStatus(message, state) {
@@ -329,8 +372,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (targetItem) {
       window.requestAnimationFrame(function () {
-        targetItem.scrollIntoView({ block: 'center', behavior: 'auto' });
-        clearReturnTarget();
+        keepTargetInView(12);
       });
       return;
     }
